@@ -109,3 +109,10 @@ Full setup details in each module's **README**:
 
 > [!TIP]
 > **Dive Deeper:** For technical diagrams, contract breakdowns, and the full lifecycle of an agent, read our [**Core Architecture Documentation**](onchain-core-base/docs/ARCHITECTURE.md).
+
+## 💬 Contact
+
+Have questions? Reach out:
+
+- Telegram: [@mtv_wd](https://t.me/mtv_wd)
+- Email: [mtvwdbsnss@gmail.com](mailto:mtvwdbsnss@gmail.com)
