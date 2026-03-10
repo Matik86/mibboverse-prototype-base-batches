@@ -94,8 +94,8 @@ User Wallet
     ```
 
 Full setup details in each module's **README**:
-- [onchain-core-base/README.md](onchain-core-base/README.md)
 - [demo/README.md](demo/README.md)
+- [onchain-core-base/README.md](onchain-core-base/README.md)
 
 ## 🏛️ Agentic Economy
 
