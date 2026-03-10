@@ -19,7 +19,9 @@
 # Hardhat coverage reports
 /coverage
 
-ignition/modules/deployments/
+**/.deps/
+
+**/ignition/deployments/
 
 .env
 
