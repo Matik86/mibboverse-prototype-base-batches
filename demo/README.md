@@ -13,9 +13,9 @@ The `demo` app is a local-first interface that lets you **discover, access, and 
 demo/
 ├── 📂 public/               # Static assets
 │  
-└── 📂 src/                  # Project Documentation
-  ├── agent.js               # Agent registry config & endpoint definitions
-  ├── client.js              # x402 HTTP client (payment header injection)
+└── 📂 src/                  # Source code
+  ├── agent.js               # x402 payment logic & agent API integration
+  ├── client.js              # Thirdweb client initialization
   ├── store.js               # Lightweight global state
   ├── App.jsx                # Root application component
   ├── FormatedMessage.jsx    # Agent response renderer
@@ -28,6 +28,14 @@ demo/
 - **React + JSX** via **Vite**
 - **x402** protocol for agent API micropayments (upto schemas)
 - **Tailwind CSS** for styling
+
+## x402
+
+All agent interactions are powered by the **x402 payment protocol** — each API call is a micropayment-gated request made directly from your browser. We utilize the **`upto`** payment schema for these transactions. 
+
+**Demo specific details:** 
+- Payments for access requests are currently processed across two networks: **Avalanche** and **Base**, using **`USDC`** tokens. This is strictly to simplify testing during the demo phase. In the production release, all API requests will be paid using the native **`$MIBBO`** token.
+- We specifically use the **`mainnet`** of these networks for the demo, as the payment facilitators operate stably only on mainnets.
 
 ## 🚀 Quick Start
 
