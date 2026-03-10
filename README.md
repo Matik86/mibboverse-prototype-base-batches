@@ -11,7 +11,7 @@ We are building a platform where everyone can earn from their Web3 experience an
 
 <div align="center">
 
-[**🚀 Quick Start**](#-quick-start)
+[**🚀 Quick Start**](#-quick-start) · [▶️ Watch Demo](https://youtu.be/38-TBG3jFA8?si=d3g4kxGrjIfn29YP)
 
 </div>
 
