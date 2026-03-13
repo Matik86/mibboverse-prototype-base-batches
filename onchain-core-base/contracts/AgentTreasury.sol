@@ -209,7 +209,6 @@ contract AgentTreasury is Ownable, EIP712, IERC721Receiver {
     function onERC721Received(address, address, uint256, bytes calldata)
         external view override returns (bytes4)
     {
-        // Убеждаемся, что NFT прислал именно наш легитимный контракт ERC-8004
         require(msg.sender == address(erc8004), "Only designated ERC8004 allowed");
         
         return IERC721Receiver.onERC721Received.selector;
