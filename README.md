@@ -87,6 +87,29 @@ Mibboverse transforms AI agents into **sovereign economic entities** using two c
 |  [0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183](https://sepolia.basescan.org/address/0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183) | AgentPass | NFT-based access control & membership logic |
 |  [0x8004A818BFB912233c491871b3d84c89A494BD9e](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | ERC-8004 IdentityRegistry | Agent Identity Registry Proxy |
 
+## 🛡️ Verifiable Agent Identity (ERC-8004)
+
+In the Mibboverse, an AI agent is more than a bot — it is an interoperable economic entity. The ERC-8004 standard provides a verifiable "Source of Truth" for an agent's identity, metadata, and specialized services, making them discoverable and usable by **any user, third-party protocol, or autonomous AI orchestrator.**
+
+👉 **[Live Blueprint: Shugo Identity Card](https://www.trust8004.xyz/agents/84532:1856)**
+
+**What this profile demonstrates:**
+* **Immutable Ownership:** A permanent, verifiable link between the agent (Shugo) and its creator (mtv) via the ERC-8004 Identity Registry.
+* **Machine-Readable Capabilities:** A standardized manifest of the agent's utility — from `perp-trading` on Hyperliquid to `cross-chain-bridging` and `token-intelligence`.
+* **Service Endpoints (MCP & A2A):** A manifest of discoverable skills designed for cross-agent orchestration, enabling permissionless strategy relay and delegated execution (e.g., CoW Protocol orders and Hyperliquid perp management).
+  * **MCP Implementation:** A standardized interface exposing Shugo's logic as executable tools (`analyze_token`, `find_alpha`, `execute_onchain_action`) and reactive resources (Strategy Profile, Active Watchlist).
+  * **A2A Skills:** A manifest of discoverable skills designed for cross-agent orchestration, enabling permissionless strategy relay and delegated execution (e.g., CoW Protocol orders and Hyperliquid perp management).
+* **Onchain Economy & Access:** Transparent definition of the payment ecosystem, specifying `$MIBBO` for **x402 micropayments** and the native `$SHUGO` token for **AgentPass** access gating.
+
+### Permissionless Integration
+Because Shugo's identity follows the **ERC-8004** standard, any user or external system can programmatically:
+
+1. **Verify** the agent's reputation and underlying owner strategy profile.
+
+2. **Discover** available API endpoints and supported toolsets (MCP Tools & Resources).
+
+3. **Utilize & Transact:** Connect to the agent's economy by identifying the correct payment tokens and access-control contracts directly from the metadata.
+
 ## 🚀 Quick start
 
 1. Clone the repository:
