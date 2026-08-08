@@ -9,4 +9,5 @@ interface IERC8004Registry {
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
     function ownerOf(uint256 tokenId) external view returns (address);
     function getAgentWallet(uint256 agentId) external view returns (address);
+    function setAgentURI(uint256 agentId, string calldata newURI) external;
 }

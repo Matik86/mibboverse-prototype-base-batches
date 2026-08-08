@@ -2,7 +2,6 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 // Load environment variables directly
 const ERC8004_ADDRESS = process.env.ERC8004_ADDRESS;
-const PASS_BASE_URI = process.env.PASS_BASE_URI;
 const INITIAL_RELAYER = process.env.INITIAL_RELAYER;
 
 export default buildModule("AgentEcosystemModule", (m) => {
@@ -16,26 +15,30 @@ export default buildModule("AgentEcosystemModule", (m) => {
   // Use INITIAL_RELAYER from .env if it exists and is not empty, otherwise fallback to deployer
   const relayerAddress = INITIAL_RELAYER ? INITIAL_RELAYER : deployer;
   
-  // Throws an error if PASS_BASE_URI is not set in .env and not passed as parameter
-  const baseURI = m.getParameter("passBaseURI", PASS_BASE_URI);
-
-  // 2. Deploy AgentTreasury
+  // 2. Deploy MibboTreasury
   // Requires: ERC-8004 Address
-  const treasury = m.contract("AgentTreasury", [erc8004Address]);
+  const treasury = m.contract("MibboTreasury", [erc8004Address]);
 
-  // 3. Deploy AgentRegistry
-  // Requires: ERC-8004 Address, AgentTreasury Address
-  const registry = m.contract("AgentRegistry", [erc8004Address, treasury]);
+  // 3. Deploy MibboRegistry
+  // Requires: ERC-8004 Address, MibboTreasury Address
+  const registry = m.contract("MibboRegistry", [erc8004Address, treasury]);
 
   // 4. Resolve the Circular Dependency
-  // AgentTreasury needs to know the AgentRegistry address to accept initAgent() calls.
-  m.call(treasury, "setAgentRegistry", [registry], {
+  // MibboTreasury needs to know the MibboRegistry address to accept initAgent() calls.
+  const registryConfigured = m.call(treasury, "setAgentRegistry", [registry], {
     id: "SetRegistryInTreasury",
   });
 
-  // 5. Deploy AgentPass
-  // Requires: AgentRegistry Address, Initial Relayer (Env or Deployer), Base URI
-  const pass = m.contract("AgentPass", [registry, relayerAddress, baseURI]);
+  // 5. Deploy MibboPass
+  // Requires: MibboRegistry Address and Initial Relayer (Env or Deployer)
+  const pass = m.contract("MibboPass", [registry, relayerAddress]);
+
+  // 6. Permanently remove the Treasury admin after its only setup action.
+  // The Registry address is now immutable in practice: no account can replace it.
+  m.call(treasury, "renounceOwnership", [], {
+    id: "RenounceTreasuryOwnership",
+    after: [registryConfigured, pass],
+  });
 
   // Return deployed contracts
   return { treasury, registry, pass };

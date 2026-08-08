@@ -1,168 +1,73 @@
-![Base](images\arch_header.png)
+# Core on-chain architecture
 
-# Architecture: Mibboverse Agentic Economy
+This document describes the current `MibboRegistry → MibboTreasury → ERC-8004` core. It does not cover the separate settlement module.
 
-Mibboverse is a specialized infrastructure for **User-Based AI Agents**. This protocol is engineered to maximize efficiency in AI-to-Human and AI-to-AI interactions by implementing a synergistic stack: **ERC-8004** for standardized identity and **x402** for granular access verification and monetization.
+## Components and trust boundaries
 
+```text
+creator
+  │ registerAgent / updateAgentMetadata / updateAgentURI
+  ▼
+MibboRegistry ─────────── beneficial owner and agent index
+  │ register NFT; forward owner-authorised metadata changes
+  ▼
+MibboTreasury ─────────── ERC-8004 identity-NFT custodian
+  │ onlyRegistry privileged calls
+  ▼
+ERC-8004 Identity Registry
 
-## 👻 Protocol Standards & Philosophy
+buyer ── ERC-20 payment ──► MibboPass (soulbound ERC-1155)
+                               ├─ full fee → beneficial owner
+                               └─ authorised relayer → recordUsage
+```
 
-### ERC-8004: Standardized Identity & Visibility
-We utilize ERC-8004 to make every Mibboverse agent discoverable across the wider ecosystem (e.g., **8004 Scan**).
+`MibboRegistry` records the permanent beneficial owner. `MibboTreasury` owns every registered ERC-8004 identity NFT, so neither the NFT nor its reputation can be transferred by the creator. The Treasury is the only component allowed to execute the privileged ERC-8004 calls; the Registry is its sole caller.
 
-- **Custodial Identity Binding:** We intentionally implement a Custodial Treasury to hold the Agent NFTs. This ensures the agent is always tied to the specific user’s wallet.
+## Registration lifecycle
 
-- **Reputation Transparency:** Since the agent cannot be transferred or sold, the history and reputation built by an agent are permanently associated with its creator, preventing "reputation washing."
+1. The creator signs the ERC-8004 `AgentWalletSet` typed data for the next agent id. The NFT owner in that signature is the Treasury, because the Treasury will custody the NFT.
+2. The creator calls `MibboRegistry.registerAgent(card, walletDeadline, walletSig)`.
+3. Registry calls `erc8004.register(card.endpoint)`, receives the identity NFT and transfers it to Treasury.
+4. Registry calls `MibboTreasury.initAgent`. Treasury verifies custody and calls ERC-8004 `setAgentWallet`.
+5. Registry stores the creator as `beneficialOwner`, adds the id to their index and emits `AgentRegistered`.
 
-### x402: Verified Access & Monetization
-The **x402** protocol serves as the verification and payment layer for all user-agent interactions.
+The wallet signature is required only for ERC-8004 registration. There is no Treasury admin signature, admin role, or Treasury nonce in the current architecture.
 
-- **Access Gating:** Instead of heavy onchain checks for every inference, x402 verifies ownership of a Soulbound (non-transferable) AgentPass.
+## Owner metadata management
 
-- **Session-Based Verification:** After an AI session ends, a dedicated Backend Relayer records usage onchain to ensure quota compliance.
+The beneficial owner updates metadata through Registry:
 
+- `updateAgentMetadata(agentId, key, value)` → `Treasury.updateMetadata` → `ERC-8004.setMetadata`
+- `updateAgentURI(agentId, newURI)` → `Treasury.updateAgentURI` → `ERC-8004.setAgentURI`
 
-## 🪙 Two Tier Economy
+Treasury rejects direct user calls. This keeps ERC-8004 write authority in custody while allowing the Registry to enforce beneficial ownership.
 
-The system operates using a two-tier token model to separate protocol maintenance from agent-specific value.
+## Access passes and usage
 
-| Token  | Role | Utility |
-| ------------- | ------------- | ------------- |
-| $MIBBO | **Ecosystem Token** | Used for infrastructure stability, protocol-level maintenance, and agent operational support. |
-| $AGENT | **Agent-Specific Token** | Used by users to purchase access passes for a specific AI agent and etc. |
+`MibboPass` is a soulbound ERC-1155. One token id equals one `agentId`.
 
-### The Revenue Loop & Custom Incentives
-When a user buys an `AgentPass` , they pay in the specific **$AGENT** token.
+1. The beneficial owner creates a versioned `PassConfig` with a payment token, fee, duration, request limit, pause state and metadata URI in one `setConfig` call.
+2. A buyer calls `purchasePass`. The previous pass for that agent, if any, is burned and replaced.
+3. The complete ERC-20 fee goes to `registry.getAgentOwner(agentId)`.
+4. The pass stores its own expiry, quota and configuration version.
+5. The contract itself requires `hasAccess(user, agentId)` inside `recordUsage`, so usage cannot be recorded for an expired, paused or exhausted pass.
 
-- **Customizable Burn:** Agent owners can set a unique `burnBps` (Basis Points). This allows them to choose between maximizing direct revenue or creating deflationary pressure on their agent's token.
+Changing a config produces a new version for future purchases. Pausing the current version blocks access checks for every holder immediately. Transfers between non-zero addresses are prohibited.
 
-- **Fee Split Calculation:** 
+Every stored `PassConfig` contains `configuredAt` and `updatedAt`. Its fixed-size fields are packed into two storage slots. Per-user `UserPassState` (`expiresAt`, quota counters and config version) is packed into one slot. `expiresAt` is created when a user purchases a pass, because users buy at different times; it is not an agent-level config value.
 
-$$ \text{Owner Amount} = Fee_{\text{agent}} - \left(\frac{Fee_{\text{agent}} \times \text{burnBps}}{10000}\right) $$
+Metadata URI is versioned together with the config. The standard ERC-1155 `uri(agentId)` returns the URI of the current version. Historical URIs remain available through `getConfigURI(agentId, version)`. Before the first config, or when its URI is empty, these getters return an empty string.
 
+## Administration and deployment
 
-## 🧩 Smart Contracts Components
+The deploy sequence is: MibboTreasury → MibboRegistry → `MibboTreasury.setAgentRegistry(registry)` → MibboPass. The Treasury owner controls `setAgentRegistry`; the current Solidity implementation permits replacing it. Treat that owner as a governance/security key and use a multisig in production.
 
-1. `AgentRegistry.sol` **(The Entry Point)**
-   
-    Handles the birth of an agent within the ecosystem.
-   - `registerAgent()`: Mints the ERC-8004 NFT, moves it to the Treasury for safety, and triggers the initial wallet binding.
-   - `getAgentInfo()`: Aggregates identity data (Owner + Wallet + Creation time).
-   - `isOwner()`: Centralized check used by other contracts to verify who has the right to configure the agent.
-  
-2. `AgentTreasury.sol` **(The Custodian)**
-   
-    Acts as a secure middleman for identity management.
-   - `initAgent()`: Securely links the newly minted agent to the user's wallet.
-   - `updateAgentWallet()`: Uses admin-signed meta-transactions to update the bound wallet without moving the NFT.
-   - `updateMetadata()`: Allows for updating agent descriptors (like API endpoints) via secure EIP-712 signatures.
+The Pass owner controls the relayer allowlist. A dedicated, low-balance relayer wallet should be used for `recordUsage` transactions.
 
-3. `AgentPass.sol` **(The Economic Hub)**
-   
-    The implementation of the **x402** logic for access and payments.
-   - `setConfig()`: Beneficial owners set the "Service Level Agreement" (Fee, Duration, Max Requests, Burn BPS).
-   - `purchasePass()`: The core economic function - Transfers ERC-20 tokens, executes the burn, mints a Soulbound ERC-1155 pass to the buyer.
-   - `recordUsage()`: Used by Relayers to report that a user has consumed a portion of their request quota.
-   - `hasAccess()`: A three-way check: Does the user have the token? Is it expired? Is there quota remaining?
+## Test coverage
 
+The core test suite verifies registration and NFT custody, owner-only Registry metadata writes, Treasury `onlyRegistry` access control, payment splitting, soulbound passes, quota depletion, configuration pause behaviour and the end-to-end lifecycle. Run it without the settlement module:
 
-## ↔️ Workflow: The Lifecycle of Core Interactions
-
-### 1. Agent Registration Workflow (Registry Flow)
-
-![Base](images\register_flow.png)
-
-1. **`registerAgent()`**
-
-    The User initiates the agent creation process by calling the `registerAgent` function on the `AgentRegistry` contract, passing the agent's metadata (`card`), a deadline, and an EIP-712 signature (`walletSig`).
-
-1. **`register()`**
-
-    The `AgentRegistry` acts as an intermediary and calls the `register(card.endpoint)` function on the `ERC8004` contract to mint a new Agent Identity NFT, using the provided endpoint as the `tokenURI`.
-
-2. **`mint`**
-
-    The `ERC800`4 contract mints the new NFT (representing the agent) and assigns ownership to the `AgentRegistry` contract. The newly generated `agentId` is returned to the Registry.
-
-3. **`safeTransferFrom()`**
-
-    Immediately after minting, the `AgentRegistry` transfers the ownership of the newly created NFT to the `AgentTreasury` contract for secure custodial storage using the standard ERC-721 `safeTransferFrom` method.
-
-4. **`initAgent()`**
-
-    The `AgentRegistry` calls the `initAgent` function on the `AgentTreasury` contract, passing the `agentId`, the User's address (`msg.sender`), the signature deadline, and the EIP-712 signature.
-
-5. **`setAgentWallet()`**
-   
-    Acting as the official owner of the NFT, the `AgentTreasury` interacts with the `ERC8004` contract to explicitly bind the User's address to the agent by calling `setAgentWallet`. This grants the User operational control over the agent without holding the NFT.
-
-6. **Return of control**
-
-    Execution flow successfully returns from the `AgentTreasury` and `ERC8004` back to the `AgentRegistry` contract, allowing it to finalize internal state updates (recording the beneficial owner).
-
-7. **`emit AgentRegistered`**
-
-    The `AgentRegistry` finalizes the transaction by emitting the `AgentRegistered(agentId, msg.sender)` event, notifying offchain indexers and the User that the agent creation and routing were completely successful.
-
-### 2. Agent Pass Workflow
-
-#### Phase 1: Configuration (Monetization Setup)
-
-1. **`setConfig()`**
-
-    The Agent Owner (beneficial owner of the agent) initiates the monetization setup by calling `setConfig(agentId, cfg)` on the `AgentPass `contract. The `cfg` payload includes the ERC-20 token address (e.g., `$AGENT`), subscription fee, maximum request limit, duration, and the token burn rate (`burnBps`).
-
-#### Phase 2: Purchase (User Acquires Access)
-
-1. **`purchasePass()`**
-
-    A User wants to access the agent and calls `purchasePass(agentId)`. The contract first validates that the agent is not paused and has a valid configuration. If the user is renewing, their existing pass is burned.
-
-2. **Owner Lookup**
-
-    The `AgentPass` contract calls `getAgentOwner(agentId)` on the `AgentRegistry` contract to retrieve the current beneficial owner's address.
-
-3. **Fee Distribution (ERC-20)**
-
-    The contract calculates the `burnAmount` (based on `burnBp`) and the `ownerAmount` (the remaining fee). It then interacts with the configured ERC-20 token (`$AGENT`) using `safeTransferFrom`:
-    - Transfers the `ownerAmount` directly from the User to the Agent Owner.
-    - Transfers the `burnAmount` from the User to the dead address (`0xdead`) to permanently burn the tokens.
-
-4. **Soulbound Minting & Metadata**
-
-    The contract mints a Soulbound (non-transferable) ERC-1155 token to the User, representing their access pass. It initializes the `_passMeta` mapping for the user, recording the `expiresAt` timestamp and `maxRequests`. Finally, it emits the `PassPurchased` event.
-
-#### Phase 3: Usage & Tracking (x402 Session)
-
-1. **Offchain Request**
-
-    The User initiates an offchain API request to interact with the AI agent (e.g., via the x402 protocol).
-
-2. **Access Verification**
-
-    Before processing the request, the Backend Relayer verifies the user's quota by calling the view function `hasAccess(user, agentId)` on the `AgentPass` contract. If it returns `true` (pass is not expired and quota is not exceeded), the AI generates a response.
-
-3. **`recordUsage()`**
-
-    After the session concludes successfully, the authorized Backend Relayer submits an onchain transaction calling `recordUsage(agentId, user, count)` to deduct the consumed requests from the user's quota.
-
-4. **Quota Update & Expiration**
-
-    The contract increments `meta.requestsUsed` by the specified `count`. If the user's total usage reaches or exceeds `maxRequests`, the contract caps the usage at the maximum limit and emits a `PassExpired(user, agentId, "requests_limit")` event, gracefully revoking further access until a new pass is purchased.
-
-
-## 🔒 Security & Grant Commitment
-
-Mibboverse is built with a "Security-First" mindset. To ensure a safe environment for our users and agent owners, our roadmap for the grant period includes:
-- **Professional Audits:** Upon receiving the grant, our immediate priority is to fund a comprehensive security audit of all core contracts (`Registry`, `Treasury`, `Pass`).
-- **Safe Hooks Implementation:** We are designing trading fee hooks to reward agent owners. These must be battle-tested and audited before deployment to ensure liquidity safety.
-- **Transparent Economy:** Every fee split and burn is verifiable onchain, ensuring a trustless environment for the agent economy.
-
-## 📌 Development Notes
-
-> [!IMPORTANT]
-> **Agent Token Deployment:** Currently, the core contracts support any ERC-20 token address for pass purchases. We are exploring the implementation of our own secure token deployment system versus integrating
-> existing industry solutions.
-> 
-> **Trading Fee Hooks:** We are developing specialized hooks for liquidity pools to allow owners to earn from $AGENT trading activity. This module is under active development and will be released only after
-> rigorous security testing.
+```bash
+npx hardhat test test/MibboRegistry.test.ts test/MibboTreasury.test.ts test/MibboPass.test.ts test/integration.test.ts
+```

@@ -10,9 +10,9 @@ All contracts are deployed on **Base Sepolia Testnet**
 
 | Address  | Name | Contracts Overview |
 | ------------- | ------------- | ------------- |
-|  [0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588](https://sepolia.basescan.org/address/0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588) | AgentTreasury | ERC-8004 Custodian & Meta-Tx Manager |
-|  [0x6328A8c481E07A5295f24f0E9E91D153592072d6](https://sepolia.basescan.org/address/0x6328A8c481E07A5295f24f0E9E91D153592072d6) | AgentRegistry | Agent Lifecycle Orchestrator & Beneficial Ownership |
-|  [0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183](https://sepolia.basescan.org/address/0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183) | AgentPass | NFT-based access control & membership logic |
+|  [0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588](https://sepolia.basescan.org/address/0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588) | Legacy treasury deployment | Historical deployment; new source contract is MibboTreasury |
+|  [0x6328A8c481E07A5295f24f0E9E91D153592072d6](https://sepolia.basescan.org/address/0x6328A8c481E07A5295f24f0E9E91D153592072d6) | Legacy registry deployment | Historical deployment; new source contract is MibboRegistry |
+|  [0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183](https://sepolia.basescan.org/address/0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183) | Legacy pass deployment | Historical deployment; new source contract is MibboPass |
 |  [0x8004A818BFB912233c491871b3d84c89A494BD9e](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | ERC-8004 IdentityRegistry | Agent Identity Registry Proxy |
 
 ## Structure 
@@ -22,9 +22,10 @@ onchain-core-base/
 ├── 📂 contracts/             # Core Smart Contracts (Solidity)
 │   ├── 📂 interfaces/        # System types and Interface definitions (IAgent...)
 │   ├── 📂 mocs/              # Mock contracts for testing and proxy implementations
-│   ├── AgentPass.sol         # NFT-based access control & membership logic
-│   ├── AgentRegistry.sol     # Agent Lifecycle Orchestrator & Beneficial Ownership
-│   └── AgentTreasury.sol     # ERC-8004 Custodian & Meta-Tx Manager
+│   ├── MibboPass.sol         # NFT-based access control & membership logic
+│   ├── MibboSettlement.sol   # x402 permit-based settlement module
+│   ├── MibboRegistry.sol     # Agent Lifecycle Orchestrator & Beneficial Ownership
+│   └── MibboTreasury.sol     # ERC-8004 Custodian & Meta-Tx Manager
 │  
 ├── 📂 docs/                  # Project Documentation
 │   └── ARCHITECTURE.md       # Deep dive into protocol design & security
@@ -37,9 +38,10 @@ onchain-core-base/
 │    └── interaction.ts       # Post-deployment lifecycle simulation script
 │
 └── 📂 test/                  # Comprehensive Test Suite (TypeScript)
-    ├── AgentPass.test.ts     # Unit: Tests subscription tiers, fee burning, and access gating logic
-    ├── AgentRegistry.test.ts # Unit: Tests minting-to-treasury routing and beneficial owner tracking
-    ├── AgentTreasury.test.ts # Unit: Tests EIP-712 signature recovery and custodial NFT safety
+    ├── MibboPass.test.ts     # Unit: Tests subscription tiers, full-fee payment, and access gating logic
+    ├── MibboSettlement.test.ts # Unit: Tests permit-based x402 settlement
+    ├── MibboRegistry.test.ts # Unit: Tests minting-to-treasury routing and beneficial owner tracking
+    ├── MibboTreasury.test.ts # Unit: Tests Registry-only ERC-8004 custody operations
     ├── integration.test.ts   # E2E: Validates cross-contract interactions (Registry → Treasury → Pass)
     └── helpers.ts            # Test Framework: Fixtures, EIP-712 hashing, and Viem assertions
 ```
@@ -126,10 +128,11 @@ This is the primary script for dev to verify the entire ecosystem. It automates 
 ```
 
 ### What this script does:
-- **Auto-Deployment:** If the ecosystem is not yet deployed, the script automatically deploys the `AgentRegistry`, `AgentTreasury`, and `AgentPass` contracts.
+- **Auto-Deployment:** If the ecosystem is not yet deployed, the script automatically deploys the `MibboRegistry`, `MibboTreasury`, and `MibboPass` contracts.
 - **Agent Registration:** Mints a new Agent NFT via ERC-8004 and routes it to the Treasury.
-- **Cryptographic Binding:** Signs and executes an EIP-712 typed data message to securely link your wallet to the Agent.
-- **Monetization Setup:** Configures business logic including subscription fees, durations, and API request limits.
+- **Cryptographic Binding:** Signs the ERC-8004 EIP-712 wallet-consent message to link a wallet during registration.
+- **Owner Metadata Management:** Updates agent metadata through `MibboRegistry`, which routes privileged ERC-8004 writes through Treasury.
+- **Monetization Setup:** Configures fees, durations, request limits and versioned pass metadata URI in one transaction.
 - **Access Purchase:** Simulates the user flow by approving tokens and purchasing an access pass.
 - **Usage Tracking:** Simulates a relayer reporting off-chain consumption to the blockchain.
 
@@ -140,14 +143,14 @@ Mibboverse is powered by integration of **ERC-8004** and **x402** protocols, des
 
 ### Key Innovations:
 * **User-Centric Identity (ERC-8004):** We utilize a **Custodial Treasury** to bind agents permanently to their creators. This ensures reputation transparency — agents cannot be sold or transferred, making their history a verifiable extension of the user.
-* **Verified Access (x402):** A high-velocity monetization layer where users acquire **Soulbound AgentPasses** using agent-specific tokens (**$AGENT**), while the $MIBBO ecosystem token ensures protocol stability.
+* **Verified Access (x402):** A high-velocity monetization layer where users acquire **Soulbound MibboPasses** using agent-specific tokens (**$AGENT**), while the $MIBBO ecosystem token ensures protocol stability.
 * **Hybrid Onchain/Offchain Tracking:** Our Backend Relayer securely records session usage onchain, providing a seamless user experience with cryptographic integrity.
 
 ### 🔒 Security & Grant Roadmap
 As a **Security-First** project, our immediate milestones following the grant acquisition are:
-1.  **Professional Audit:** Full security audit of `AgentRegistry`, `AgentTreasury`, and `AgentPass` core contracts.
+1.  **Professional Audit:** Full security audit of `MibboRegistry`, `MibboTreasury`, `MibboPass`, and `MibboSettlement`.
 2.  **$AGENT Fee Hooks:** Implementation of secure liquidity pool hooks to allow agent owners to capture value from trading activity.
-3.  **Transparent Economy:** Ensuring every burn and fee-split is mathematically verifiable and resistant to manipulation.
+3.  **Transparent Economy:** Ensuring every access-payment flow is mathematically verifiable and resistant to manipulation.
 
 > [!TIP]
 > **Dive Deeper:** For technical diagrams, contract breakdowns, and the full lifecycle of an agent, read our [**Core Architecture Documentation**](docs/ARCHITECTURE.md).

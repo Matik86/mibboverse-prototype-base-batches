@@ -44,11 +44,11 @@ export default defineConfig({
       chainType: "l1",
       url: configVariable("BASE_SEPOLIA_RPC_URL"),
       accounts: [configVariable("PRIVATE_KEY")],
-    }
+    },
   },
   verify: {
     etherscan: {
-      apiKey: "YOUR_ETHERSCAN_API_KEY",
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
     },
     blockscout: {
       enabled: true,
