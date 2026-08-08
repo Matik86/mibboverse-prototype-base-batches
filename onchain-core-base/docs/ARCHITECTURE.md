@@ -1,73 +1,93 @@
-# Core on-chain architecture
+# Mibboverse v2 core architecture
 
-This document describes the current `MibboRegistry → MibboTreasury → ERC-8004` core. It does not cover the separate settlement module.
+The core consists of `MibboRegistry`, `MibboTreasury`, and `MibboPass`. `MibboSettlement` is a separate optional x402 payment component; see [x402 settlement](x402-settlement.md).
 
-## Components and trust boundaries
+For diagrams and the public contract surface, see the [contract overview](contracts-overview.md).
 
-```text
-creator
-  │ registerAgent / updateAgentMetadata / updateAgentURI
-  ▼
-MibboRegistry ─────────── beneficial owner and agent index
-  │ register NFT; forward owner-authorised metadata changes
-  ▼
-MibboTreasury ─────────── ERC-8004 identity-NFT custodian
-  │ onlyRegistry privileged calls
-  ▼
-ERC-8004 Identity Registry
+## Trust boundaries
 
-buyer ── ERC-20 payment ──► MibboPass (soulbound ERC-1155)
-                               ├─ full fee → beneficial owner
-                               └─ authorised relayer → recordUsage
+```mermaid
+flowchart TD
+    C["Creator / agent beneficial owner"]
+    B["Pass buyer"]
+    L["Authorised relayer"]
+    E["ERC-8004 Identity Registry"]
+    R["MibboRegistry<br/>no global owner"]
+    T["MibboTreasury<br/>identity NFT custodian<br/>owner renounced after setup"]
+    P["MibboPass<br/>soulbound ERC-1155"]
+
+    C -->|"registerAgent; identity updates"| R
+    R -->|"register and transfer identity NFT"| E
+    R -->|"onlyRegistry calls"| T
+    T -->|"privileged ERC-8004 writes"| E
+    C -->|"setConfig; setPaused"| P
+    B -->|"purchasePass"| P
+    P -->|"ownership lookup"| R
+    L -->|"recordUsage"| P
 ```
 
-`MibboRegistry` records the permanent beneficial owner. `MibboTreasury` owns every registered ERC-8004 identity NFT, so neither the NFT nor its reputation can be transferred by the creator. The Treasury is the only component allowed to execute the privileged ERC-8004 calls; the Registry is its sole caller.
+### MibboRegistry
 
-## Registration lifecycle
+Registry records an immutable-in-practice beneficial owner for each newly registered `agentId`. It has no `Ownable` inheritance or global administrator. The agent beneficial owner alone may update that agent's ERC-8004 metadata and URI through the Registry.
 
-1. The creator signs the ERC-8004 `AgentWalletSet` typed data for the next agent id. The NFT owner in that signature is the Treasury, because the Treasury will custody the NFT.
-2. The creator calls `MibboRegistry.registerAgent(card, walletDeadline, walletSig)`.
-3. Registry calls `erc8004.register(card.endpoint)`, receives the identity NFT and transfers it to Treasury.
-4. Registry calls `MibboTreasury.initAgent`. Treasury verifies custody and calls ERC-8004 `setAgentWallet`.
-5. Registry stores the creator as `beneficialOwner`, adds the id to their index and emits `AgentRegistered`.
+Registry's ERC-8004 and Treasury addresses are constructor immutables.
 
-The wallet signature is required only for ERC-8004 registration. There is no Treasury admin signature, admin role, or Treasury nonce in the current architecture.
+### MibboTreasury
 
-## Owner metadata management
+Treasury owns the ERC-8004 identity NFT after registration and is the sole component that calls ERC-8004's privileged wallet, metadata, and URI functions. `onlyRegistry` permits those Treasury functions only for the configured Registry.
 
-The beneficial owner updates metadata through Registry:
+`AgentEcosystem` configures the Registry and then calls `renounceOwnership()`. The owner becomes `address(0)`, so the trusted Registry cannot subsequently be changed. This trust-minimising finalisation is part of the standard v2 deployment, not an optional post-deployment operation.
 
-- `updateAgentMetadata(agentId, key, value)` → `Treasury.updateMetadata` → `ERC-8004.setMetadata`
-- `updateAgentURI(agentId, newURI)` → `Treasury.updateAgentURI` → `ERC-8004.setAgentURI`
+### MibboPass
 
-Treasury rejects direct user calls. This keeps ERC-8004 write authority in custody while allowing the Registry to enforce beneficial ownership.
+MibboPass is a soulbound ERC-1155. An ERC-1155 `tokenId` equals `agentId`, so marketplace metadata resolution uses the standard `uri(agentId)` interface.
 
-## Access passes and usage
+- The beneficial owner creates a versioned pass configuration via `setConfig`.
+- A config contains payment token, full subscription fee, duration, request limit, pause state, and a metadata URI.
+- `purchasePass` sends the entire fee directly to `MibboRegistry.getAgentOwner(agentId)`.
+- A purchase replaces the buyer's previous pass for the same agent.
+- Each purchased pass stores its own expiry, quota counters, and config version in `UserPassState`.
+- `recordUsage` is restricted to the MibboPass relayer allowlist and rejects a missing, paused, expired, or quota-exhausted pass.
 
-`MibboPass` is a soulbound ERC-1155. One token id equals one `agentId`.
+`MibboPass` ownership is deliberately retained after deployment because its owner manages the relayer allowlist. Use a secure governance account or multisig for this role, and use dedicated low-balance relayer wallets.
 
-1. The beneficial owner creates a versioned `PassConfig` with a payment token, fee, duration, request limit, pause state and metadata URI in one `setConfig` call.
-2. A buyer calls `purchasePass`. The previous pass for that agent, if any, is burned and replaced.
-3. The complete ERC-20 fee goes to `registry.getAgentOwner(agentId)`.
-4. The pass stores its own expiry, quota and configuration version.
-5. The contract itself requires `hasAccess(user, agentId)` inside `recordUsage`, so usage cannot be recorded for an expired, paused or exhausted pass.
+## Agent lifecycle
 
-Changing a config produces a new version for future purchases. Pausing the current version blocks access checks for every holder immediately. Transfers between non-zero addresses are prohibited.
+1. The creator signs the ERC-8004 `AgentWalletSet` typed data for the next agent ID, naming Treasury as the NFT owner.
+2. The creator calls `MibboRegistry.registerAgent`.
+3. Registry registers the ERC-8004 identity NFT and transfers it to Treasury.
+4. Registry calls `MibboTreasury.initAgent`; Treasury verifies NFT custody and calls ERC-8004 `setAgentWallet`.
+5. Registry records the creator as `beneficialOwner` and emits `AgentRegistered`.
 
-Every stored `PassConfig` contains `configuredAt` and `updatedAt`. Its fixed-size fields are packed into two storage slots. Per-user `UserPassState` (`expiresAt`, quota counters and config version) is packed into one slot. `expiresAt` is created when a user purchases a pass, because users buy at different times; it is not an agent-level config value.
+The identity NFT and reputation cannot be transferred by the creator because Treasury retains custody. The beneficial owner is an on-chain registry record used for authorisation and payment routing.
 
-Metadata URI is versioned together with the config. The standard ERC-1155 `uri(agentId)` returns the URI of the current version. Historical URIs remain available through `getConfigURI(agentId, version)`. Before the first config, or when its URI is empty, these getters return an empty string.
+## Pass lifecycle and metadata
 
-## Administration and deployment
+1. An agent beneficial owner calls `MibboPass.setConfig(agentId, cfg)`.
+2. The call creates a new configuration version and stores its metadata URI with that version.
+3. A buyer approves the configured ERC-20 and calls `purchasePass(agentId)`.
+4. MibboPass mints one soulbound ERC-1155 token with `tokenId == agentId` and stores user-specific state.
+5. An authorised relayer calls `recordUsage` as off-chain requests are consumed.
 
-The deploy sequence is: MibboTreasury → MibboRegistry → `MibboTreasury.setAgentRegistry(registry)` → MibboPass. The Treasury owner controls `setAgentRegistry`; the current Solidity implementation permits replacing it. Treat that owner as a governance/security key and use a multisig in production.
+The current ERC-1155 URI is available through `uri(agentId)`. Historical config URIs remain readable through `getConfigURI(agentId, version)`. Changing a configuration affects future purchases; pausing the current config immediately makes `hasAccess` false for all holders of that agent's pass.
 
-The Pass owner controls the relayer allowlist. A dedicated, low-balance relayer wallet should be used for `recordUsage` transactions.
+## Deployment finalisation
+
+```mermaid
+flowchart TD
+    T["Deploy MibboTreasury"] --> R["Deploy MibboRegistry"]
+    R --> C["Treasury.setAgentRegistry(registry)"]
+    C --> P["Deploy MibboPass"]
+    P --> F["Treasury.renounceOwnership()"]
+    F --> Z["Treasury owner = address(0)"]
+```
+
+`MibboSettlement` is not deployed by this module and must be deployed separately when required.
 
 ## Test coverage
 
-The core test suite verifies registration and NFT custody, owner-only Registry metadata writes, Treasury `onlyRegistry` access control, payment splitting, soulbound passes, quota depletion, configuration pause behaviour and the end-to-end lifecycle. Run it without the settlement module:
+The v2 test suite covers agent registration and NFT custody, beneficial-owner metadata updates, Treasury `onlyRegistry` restrictions, ownership finalisation, soulbound passes, pass configuration versioning and URIs, fee routing, quota/expiry/pause enforcement, and x402 settlement authorisation.
 
-```bash
-npx hardhat test test/MibboRegistry.test.ts test/MibboTreasury.test.ts test/MibboPass.test.ts test/integration.test.ts
+```powershell
+npx hardhat test test/MibboRegistry.test.ts test/MibboTreasury.test.ts test/MibboPass.test.ts test/integration.test.ts test/MibboSettlement.test.ts
 ```

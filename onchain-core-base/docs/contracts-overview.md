@@ -1,5 +1,7 @@
 # Contract architecture: MibboRegistry · MibboTreasury · MibboPass
 
+> `MibboSettlement` is intentionally independent of this ecosystem stack. See [x402 settlement](x402-settlement.md).
+
 ## 1. Contract relationships
 
 ```mermaid

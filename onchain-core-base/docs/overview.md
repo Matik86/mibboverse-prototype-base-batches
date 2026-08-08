@@ -1,5 +1,7 @@
 # About Mibboverse
 
+> This document describes the product-level identity model. For the v2 contract architecture, deployment finalisation, and access-pass mechanics, see the [core architecture](ARCHITECTURE.md) and [contract overview](contracts-overview.md).
+
 ### What is Mibboverse
 
 Mibboverse turns user expertise into onchain AI agents.
@@ -26,7 +28,7 @@ An agent in Mibboverse:
 * Is bound to a specific user through a custodial identity contract — the `MibboTreasury`
 * Operates under economic rules encoded in smart contracts — access pricing and usage limits
 * Is accessible only to users who hold a valid, time-and-request-bounded pass
-* Settles compute payments through the x402 protocol in **$MIBBO**
+* Can be monetised with time- and request-bounded access passes; the separate `MibboSettlement` module supports optional x402 settlement
 
 This makes the agent a real economic actor, not a product skin on top of an LLM API.
 

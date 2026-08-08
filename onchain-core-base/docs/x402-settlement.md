@@ -1,6 +1,6 @@
-# Internal x402 settlement contract
+# MibboSettlement: internal x402 settlement
 
-`MibboSettlement` is a non-upgradeable, private settlement contract for one EIP-2612 token and one immutable treasury.
+`MibboSettlement` is a non-upgradeable, private settlement contract for one EIP-2612 token and one immutable treasury. It is independent of `MibboRegistry`, `MibboTreasury`, and `MibboPass`; deploy it only for a sign-once, settle-many x402 flow.
 
 - The user signs one EIP-2612 Permit naming the settlement contract as spender.
 - The backend relayer sends `activateAndSettle` once. It atomically applies Permit, creates the on-chain quota and charges the first request.
@@ -11,7 +11,19 @@
 
 The relayer can consume the unused amount of a valid authorization. That is the necessary trust boundary of a sign-once, settle-many model. A compromise cannot exceed the user-signed quota or redirect funds to another recipient.
 
-Use a multisig as `owner` and a dedicated, low-balance gas wallet as `relayer` in production.
+Use a multisig as `owner` and a dedicated, low-balance gas wallet as `relayer` in production. Unlike MibboTreasury, this owner must remain available for emergency pause/unpause and relayer rotation.
+
+## Public interface
+
+`IMibboSettlement` contains the module's custom errors, events, and external interface.
+
+| Function | Caller | Purpose |
+|---|---|---|
+| `activateAndSettle(...)` | Relayer | Applies Permit, creates an authorisation, and settles the first charge atomically. |
+| `settle(authorizationId, amount, chargeId)` | Relayer | Settles a subsequent unique charge within the remaining quota. |
+| `cancelAuthorization(authorizationId)` | Payer | Prevents future charges from that authorisation. |
+| `setRelayer(address)` | Owner | Rotates the relayer. |
+| `pause()` / `unpause()` | Owner | Emergency control of new settlements. |
 
 ## Deployment
 
@@ -31,3 +43,5 @@ npx hardhat ignition deploy ignition/modules/MibboSettlement.ts --network baseSe
 ```
 
 The private key used to send the deployment transaction remains the existing `PRIVATE_KEY` from `.env`; it is not passed to the contract.
+
+For the agent identity and pass deployment, see [core architecture](ARCHITECTURE.md).

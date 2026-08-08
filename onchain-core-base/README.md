@@ -1,156 +1,133 @@
-﻿![Base](docs\images\main_header.png)
+![Mibboverse](docs/images/main_header.png)
 
-> This folder contains the smart contracts that power the AI Agent Ecosystem.
+# Mibboverse on-chain core — v2
 
-📖 **[Read the Core Architecture Documentation](docs/ARCHITECTURE.md)** for deep dives into protocol design, workflow schemas, and ERC-8004/x402 integration.
+The v2 smart-contract suite for non-transferable ERC-8004 agent identities, versioned ERC-1155 access passes, and optional x402 settlement.
 
-## Deployed Contracts
+## Contracts
 
-All contracts are deployed on **Base Sepolia Testnet**
+| Contract | Purpose | Administrative model |
+|---|---|---|
+| `MibboRegistry` | Registers agents, records their beneficial owners, and authorises identity metadata writes. | No global owner. |
+| `MibboTreasury` | Custodies ERC-8004 identity NFTs and executes privileged ERC-8004 writes. | Its owner is renounced by the `AgentEcosystem` Ignition module after Registry configuration. |
+| `MibboPass` | Soulbound ERC-1155 access passes. Each `agentId` is the ERC-1155 token ID. | Owner manages the relayer allowlist. Agent owners manage their own pass configs. |
+| `MibboSettlement` | Optional non-upgradeable EIP-2612 sign-once, settle-many payment module. | Separate owner controls pausing and relayer rotation. |
 
-| Address  | Name | Contracts Overview |
-| ------------- | ------------- | ------------- |
-|  [0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588](https://sepolia.basescan.org/address/0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588) | Legacy treasury deployment | Historical deployment; new source contract is MibboTreasury |
-|  [0x6328A8c481E07A5295f24f0E9E91D153592072d6](https://sepolia.basescan.org/address/0x6328A8c481E07A5295f24f0E9E91D153592072d6) | Legacy registry deployment | Historical deployment; new source contract is MibboRegistry |
-|  [0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183](https://sepolia.basescan.org/address/0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183) | Legacy pass deployment | Historical deployment; new source contract is MibboPass |
-|  [0x8004A818BFB912233c491871b3d84c89A494BD9e](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | ERC-8004 IdentityRegistry | Agent Identity Registry Proxy |
+`MibboSettlement` is intentionally independent of the agent ecosystem deployment. It is deployed only when the x402 settlement flow is needed.
 
-## Structure 
+## Documentation
 
-```
+- [Core architecture](docs/ARCHITECTURE.md) — trust boundaries, lifecycle, access passes, and deployment finalisation.
+- [Contract overview](docs/contracts-overview.md) — diagrams, public responsibilities, and invariants.
+- [Protocol overview](docs/overview.md) — product-level identity and custody model.
+- [x402 settlement](docs/x402-settlement.md) — `MibboSettlement` model and deployment.
+
+## Existing Base Sepolia deployments
+
+The following addresses are historical deployments made before the v2 contract renaming and architecture changes. They are not v2 deployments and must not be treated as matching the current source.
+
+| Address | Historical role |
+|---|---|
+| [0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588](https://sepolia.basescan.org/address/0x9b14f04383F57c67A4Ade9cD82d92c4944ecb588) | Legacy Treasury |
+| [0x6328A8c481E07A5295f24f0E9E91D153592072d6](https://sepolia.basescan.org/address/0x6328A8c481E07A5295f24f0E9E91D153592072d6) | Legacy Registry |
+| [0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183](https://sepolia.basescan.org/address/0xe1221095e1a4bCc8f6F6b6B30f3aCc6505318183) | Legacy Pass |
+| [0x8004A818BFB912233c491871b3d84c89A494BD9e](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | ERC-8004 Identity Registry proxy |
+
+## Repository layout
+
+```text
 onchain-core-base/
-├── 📂 contracts/             # Core Smart Contracts (Solidity)
-│   ├── 📂 interfaces/        # System types and Interface definitions (IAgent...)
-│   ├── 📂 mocs/              # Mock contracts for testing and proxy implementations
-│   ├── MibboPass.sol         # NFT-based access control & membership logic
-│   ├── MibboSettlement.sol   # x402 permit-based settlement module
-│   ├── MibboRegistry.sol     # Agent Lifecycle Orchestrator & Beneficial Ownership
-│   └── MibboTreasury.sol     # ERC-8004 Custodian & Meta-Tx Manager
-│  
-├── 📂 docs/                  # Project Documentation
-│   └── ARCHITECTURE.md       # Deep dive into protocol design & security
-│  
-├── 📂 ignition/modules/      # Hardhat Ignition Deployment Framework
-│   ├── AgentEcosystem.ts     # Orchestrates the multi-contract deployment sequence
-│   └── TestToken.ts          # Deploys ERC20 mocks for staging environments
-│          
-├── 📂 scripts/               # Maintenance & Interaction Tools
-│    └── interaction.ts       # Post-deployment lifecycle simulation script
-│
-└── 📂 test/                  # Comprehensive Test Suite (TypeScript)
-    ├── MibboPass.test.ts     # Unit: Tests subscription tiers, full-fee payment, and access gating logic
-    ├── MibboSettlement.test.ts # Unit: Tests permit-based x402 settlement
-    ├── MibboRegistry.test.ts # Unit: Tests minting-to-treasury routing and beneficial owner tracking
-    ├── MibboTreasury.test.ts # Unit: Tests Registry-only ERC-8004 custody operations
-    ├── integration.test.ts   # E2E: Validates cross-contract interactions (Registry → Treasury → Pass)
-    └── helpers.ts            # Test Framework: Fixtures, EIP-712 hashing, and Viem assertions
+├── contracts/
+│   ├── interfaces/               # Interfaces and AgentTypes
+│   ├── mocs/                     # Test mocks
+│   ├── MibboRegistry.sol
+│   ├── MibboTreasury.sol
+│   ├── MibboPass.sol
+│   └── MibboSettlement.sol
+├── docs/
+├── ignition/modules/
+│   ├── AgentEcosystem.ts         # Registry, Treasury and Pass deployment
+│   ├── MibboSettlement.ts        # Standalone settlement deployment
+│   └── TestToken.ts
+├── scripts/
+│   ├── interaction.ts
+│   ├── updateMetadata.ts
+│   └── deployMibboSettlement.ts
+└── test/
 ```
 
-### Tech stack snapshot
+## Setup
 
-- Solidity contracts compiled and verified with Hardhat + TypeScript.
-- Viem + `node:test` helpers for the interaction script & integration scenarios.
-- Ignition modules for seeded deployments (`AgentEcosystem`, `TestToken`).
+```powershell
+cd D:\Solidity\mibboverse-prototype\onchain-core-base
+copy .env.example .env
+npm install
+```
 
-## 🚀 Quick start
+Populate only the variables needed for the command you are running. `.env.example` documents the ecosystem, metadata-update, and settlement values. Never commit `.env` or private keys.
 
-> To run this project locally, you need **Node.js** and **Hardhat** installed.
+## Tests
 
-1. Change to the onchain-core-base directory:
-   ```bash
-   cd onchain-core-base
-   ```
+Run the v2 core suite:
 
-2. Copy the environment template and fill in the secrets.
-   ```bash
-   cp .env.example .env  # or `copy` on Windows
-   ```
+```powershell
+npx hardhat test test/MibboRegistry.test.ts test/MibboTreasury.test.ts test/MibboPass.test.ts test/integration.test.ts test/MibboSettlement.test.ts
+```
 
-3. Install dependencies.
-   ```bash
-   npm install
-   ```
+## Deploying the agent ecosystem
 
-4. (Optional) Install Hardhat globally if you haven't yet:
-
-   ```bash
-   npm install --save-dev hardhat
-   ```
-
-5. Compile the contracts.
-   ```bash
-   npx hardhat compile
-   ```
-
-6. Configure environment variables for deployment:
-
-   ```env
-   PRIVATE_KEY="your_private_key"
-   BASE_SEPOLIA_RPC_URL="base_sepolia_rpc_url"
-   ```
-
-7. Run Full Lifecycle Simulation:
-   Run the main script to see the ecosystem in action (deployment, agent registration, and access purchase):
-
-   ```bash
-   npx hardhat run scripts/interaction.ts --network baseSepolia
-   ```
-   > *For details on what this script does, see the section* [Full Lifecycle Simulation](#full-lifecycle-simulation--e2e-workflow)
-
-## 🧪 Tests (Optional)
-
-To run all tests, execute this command:
+Required configuration:
 
 ```env
-npx hardhat test
+PRIVATE_KEY=""
+BASE_SEPOLIA_RPC_URL=""
+ERC8004_ADDRESS=""
+INITIAL_RELAYER=""
 ```
 
-## ✨ Ignition deployments (Optional)
+`INITIAL_RELAYER` is optional. If empty, the deployer is initially added as a MibboPass relayer. For production, set a dedicated low-balance relayer address.
 
-1. Seed the AgentEcosystem stack (registry, treasury, pass) on a chosen network.
-   ```bash
-   npx hardhat ignition deploy ignition/modules/AgentEcosystem.ts --network baseSepolia
-   ```
-2. Deploy the TestToken contract (ERC20 faucet) on a chosen network.
-   ```bash
-   npx hardhat ignition deploy ignition/modules/TestToken.ts --network baseSepolia
-   ```
-   > *Note:* This step is optional. You can use the existing contract 
-   > already deployed on the Base Sepolia network at: `0xCaA5471D0d85Ed8d16cDe2925f16Af7bD0E4f751`
-
-
-## 🔄 Full Lifecycle Simulation | E2E Workflow
-
-This is the primary script for dev to verify the entire ecosystem. It automates the full journey of an AI Agent — from onchain identity creation to monetization and usage.
-
-```bash
-   npx hardhat run scripts/interaction.ts --network baseSepolia
+```powershell
+npx hardhat ignition deploy ignition/modules/AgentEcosystem.ts --network baseSepolia
 ```
 
-### What this script does:
-- **Auto-Deployment:** If the ecosystem is not yet deployed, the script automatically deploys the `MibboRegistry`, `MibboTreasury`, and `MibboPass` contracts.
-- **Agent Registration:** Mints a new Agent NFT via ERC-8004 and routes it to the Treasury.
-- **Cryptographic Binding:** Signs the ERC-8004 EIP-712 wallet-consent message to link a wallet during registration.
-- **Owner Metadata Management:** Updates agent metadata through `MibboRegistry`, which routes privileged ERC-8004 writes through Treasury.
-- **Monetization Setup:** Configures fees, durations, request limits and versioned pass metadata URI in one transaction.
-- **Access Purchase:** Simulates the user flow by approving tokens and purchasing an access pass.
-- **Usage Tracking:** Simulates a relayer reporting off-chain consumption to the blockchain.
+The module performs these actions in order:
 
+1. Deploy `MibboTreasury`.
+2. Deploy `MibboRegistry` with the ERC-8004 and Treasury addresses.
+3. Configure Treasury to trust that Registry.
+4. Deploy `MibboPass` with the Registry and initial relayer.
+5. Call `MibboTreasury.renounceOwnership()`.
 
-## 🏛️ Architecture & Agentic Economy
+After step 5, no account can replace the Registry trusted by Treasury. Do not run this module until the supplied ERC-8004 address and deployment account have been verified.
 
-Mibboverse is powered by integration of **ERC-8004** and **x402** protocols, designed to transform AI agents into sovereign economic entities.
+## Deploying MibboSettlement
 
-### Key Innovations:
-* **User-Centric Identity (ERC-8004):** We utilize a **Custodial Treasury** to bind agents permanently to their creators. This ensures reputation transparency — agents cannot be sold or transferred, making their history a verifiable extension of the user.
-* **Verified Access (x402):** A high-velocity monetization layer where users acquire **Soulbound MibboPasses** using agent-specific tokens (**$AGENT**), while the $MIBBO ecosystem token ensures protocol stability.
-* **Hybrid Onchain/Offchain Tracking:** Our Backend Relayer securely records session usage onchain, providing a seamless user experience with cryptographic integrity.
+Set these public addresses in `.env`:
 
-### 🔒 Security & Grant Roadmap
-As a **Security-First** project, our immediate milestones following the grant acquisition are:
-1.  **Professional Audit:** Full security audit of `MibboRegistry`, `MibboTreasury`, `MibboPass`, and `MibboSettlement`.
-2.  **$AGENT Fee Hooks:** Implementation of secure liquidity pool hooks to allow agent owners to capture value from trading activity.
-3.  **Transparent Economy:** Ensuring every access-payment flow is mathematically verifiable and resistant to manipulation.
+```env
+SETTLEMENT_TOKEN_ADDRESS=""
+SETTLEMENT_TREASURY_ADDRESS=""
+SETTLEMENT_OWNER_ADDRESS=""
+SETTLEMENT_RELAYER_ADDRESS=""
+```
 
-> [!TIP]
-> **Dive Deeper:** For technical diagrams, contract breakdowns, and the full lifecycle of an agent, read our [**Core Architecture Documentation**](docs/ARCHITECTURE.md).
+Then deploy:
+
+```powershell
+npx hardhat ignition deploy ignition/modules/MibboSettlement.ts --network baseSepolia
+```
+
+Use a multisig for `SETTLEMENT_OWNER_ADDRESS` and a dedicated gas wallet for `SETTLEMENT_RELAYER_ADDRESS`.
+
+## Operational scripts
+
+```powershell
+# Demonstrate registration, pass configuration, purchase, and usage.
+npx hardhat run scripts/interaction.ts --network baseSepolia
+
+# Update an agent metadata key through MibboRegistry.
+npx hardhat run scripts/updateMetadata.ts --network baseSepolia
+```
+
+The metadata script uses `MIBBO_REGISTRY_ADDRESS`, `AGENT_ID`, `METADATA_KEY`, and `METADATA_VALUE` from `.env`.
