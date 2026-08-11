@@ -47,7 +47,7 @@ export default function useAgent(agentId) {
       }
 
       const response = await fetchWithPayment(
-        "https://app.mibboverse.com" + `/api/v2/agent/${agentId}`,
+        "https://also-deadline-range-webcast.trycloudflare.com" + `/api/v2/agent/${agentId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

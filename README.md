@@ -47,17 +47,35 @@ Mibboverse transforms AI agents into **sovereign economic entities** using two c
 - **x402** — a pay-per-use monetization layer. Every agent API call is a micropayment signed by the user's wallet — no API keys, no subscriptions.
 
 ```
-User Wallet
-    │
-    ▼
-[demo UI]  ──x402 signed request──▶  [Agent x402 API]
-                                            │
-                                     validates payment
-                                            │
-                                     returns response
-                                            │
-                              [onchain-core-base contracts]
-                         AgentRegistry · AgentTreasury · AgentPass
+                                                    ┌────────────────────────────────────┐
+                                                    │                                    │
+                                                    ▼                                    │
+                                                  [User]                                 │
+                                                    │  request                           │
+                                                    ▼                                    │
+                                                   [UI]                                  │
+                                                    │  signed request + wallet address   │
+                                                    ▼                                    │
+                                              [Agent x402 API]                           │
+                                                    │  check access                      │
+                                                    ▼                                    │
+                                               [AgentPass]                               │
+                                            (smart contract)                             │
+                                                    ├── no access ──▶  [402 Error]      │
+                                                    │                                    │
+                                                    │  has access                        │
+                                                    ▼                                    │
+                                              settle & verify                            │
+                                                 payment                                 │
+                                                    │                                    │
+                                                    ▼                                    │
+                                                [Agent]                                  │
+                                               processes                                 │
+                                                request                                  │
+                                                    │  response                          │
+                                                    ▼                                    │
+                                                  [UI]───────────────────────────────────┘
+                                                                result to user
 ```
 
 ## Deployed Contracts (Base Sepolia Testnet)

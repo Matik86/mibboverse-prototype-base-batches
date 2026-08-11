@@ -144,7 +144,30 @@ contract MibboPass is ERC1155, Ownable, IMibboPass {
                meta.requestsUsed < meta.maxRequests;
     }
 
-    function recordUsage(uint256 agentId, address user, uint256 count) external onlyRelayer {
+    function recordUsage(uint256 agentId, address user, uint256 count)
+        external override onlyRelayer
+    {
+        _recordUsage(agentId, user, count);
+    }
+
+    function batchRecordUsage(
+        uint256[] calldata agentIds,
+        address[] calldata users,
+        uint256[] calldata counts
+    ) external override onlyRelayer {
+        uint256 length = agentIds.length;
+        if (length == 0 || users.length != length || counts.length != length) {
+            revert InvalidUsageBatchLength(length, users.length, counts.length);
+        }
+
+        // Keep batch semantics identical to recordUsage. A failure in any item
+        // reverts the whole transaction, so the backend never records a partial batch.
+        for (uint256 i = 0; i < length; ++i) {
+            _recordUsage(agentIds[i], users[i], counts[i]);
+        }
+    }
+
+    function _recordUsage(uint256 agentId, address user, uint256 count) internal {
         if (!hasAccess(user, agentId)) revert NoActivePass(user, agentId);
 
         UserPassState storage meta = _passMeta[agentId][user];

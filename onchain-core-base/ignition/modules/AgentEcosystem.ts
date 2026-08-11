@@ -31,7 +31,11 @@ export default buildModule("AgentEcosystemModule", (m) => {
 
   // 5. Deploy MibboPass
   // Requires: MibboRegistry Address and Initial Relayer (Env or Deployer)
-  const pass = m.contract("MibboPass", [registry, relayerAddress]);
+  const pass = m.contract("MibboPass", [registry, relayerAddress], {
+    // Some RPC providers allow only one in-flight transaction for delegated
+    // accounts. Keep the setup transaction and Pass deployment sequential.
+    after: [registryConfigured],
+  });
 
   // 6. Permanently remove the Treasury admin after its only setup action.
   // The Registry address is now immutable in practice: no account can replace it.

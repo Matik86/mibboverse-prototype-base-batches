@@ -42,6 +42,54 @@ describe("MibboPass", { concurrency: 1 }, () => {
     await assert.rejects(buyerPass.write.recordUsage([agentId, ctx.user2.account.address, 1n]));
   });
 
+  it("records usage for multiple users and agents in one atomic batch", async () => {
+    const firstAgentId = await registerAgent(ctx);
+    const secondAgentId = await registerAgent(ctx);
+    await configure(firstAgentId);
+    await configure(secondAgentId);
+
+    await ctx.token.write.mint([ctx.stranger.account.address, parseUnits("1000", 6)]);
+    await ctx.token.write.approve([ctx.pass.address, parseUnits("20", 6)], { account: ctx.user2.account });
+    await ctx.token.write.approve([ctx.pass.address, parseUnits("20", 6)], { account: ctx.stranger.account });
+
+    const firstBuyerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.user2 } });
+    const secondBuyerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.stranger } });
+    await firstBuyerPass.write.purchasePass([firstAgentId]);
+    await secondBuyerPass.write.purchasePass([secondAgentId]);
+
+    const relayerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.relayer } });
+    await relayerPass.write.batchRecordUsage([
+      [firstAgentId, secondAgentId],
+      [ctx.user2.account.address, ctx.stranger.account.address],
+      [25n, 100n],
+    ]);
+
+    assert.equal((await ctx.pass.read.getPassStatus([ctx.user2.account.address, firstAgentId]))[3], 25n);
+    assert.equal(await ctx.pass.read.hasAccess([ctx.user2.account.address, firstAgentId]), true);
+    assert.equal((await ctx.pass.read.getPassStatus([ctx.stranger.account.address, secondAgentId]))[3], 100n);
+    assert.equal(await ctx.pass.read.hasAccess([ctx.stranger.account.address, secondAgentId]), false);
+  });
+
+  it("rejects malformed, unauthorized, and partially invalid usage batches", async () => {
+    const agentId = await registerAgent(ctx);
+    await configure(agentId);
+    await ctx.token.write.approve([ctx.pass.address, parseUnits("10", 6)], { account: ctx.user2.account });
+    const buyerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.user2 } });
+    await buyerPass.write.purchasePass([agentId]);
+
+    const relayerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.relayer } });
+    await assert.rejects(relayerPass.write.batchRecordUsage([[], [], []]));
+    await assert.rejects(relayerPass.write.batchRecordUsage([[agentId], [], [1n]]));
+    await assert.rejects(buyerPass.write.batchRecordUsage([[agentId], [ctx.user2.account.address], [1n]]));
+
+    await assert.rejects(relayerPass.write.batchRecordUsage([
+      [agentId, agentId],
+      [ctx.user2.account.address, ctx.stranger.account.address],
+      [10n, 1n],
+    ]));
+    assert.equal((await ctx.pass.read.getPassStatus([ctx.user2.account.address, agentId]))[3], 0n);
+  });
+
   it("rejects usage recording after the pass has expired", async () => {
     const agentId = await registerAgent(ctx);
     await configure(agentId);

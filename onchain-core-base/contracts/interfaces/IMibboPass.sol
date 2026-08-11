@@ -15,6 +15,11 @@ interface IMibboPass {
     error NotAgentOwner(uint256 agentId, address caller);
     error NotRelayer(address caller);
     error ZeroRelayerAddress();
+    error InvalidUsageBatchLength(
+        uint256 agentIdsLength,
+        uint256 usersLength,
+        uint256 countsLength
+    );
 
     event Locked(uint256 indexed tokenId);
     event PassPurchased(
@@ -36,6 +41,14 @@ interface IMibboPass {
     function purchasePass(uint256 agentId) external;
 
     function hasAccess(address user, uint256 agentId) external view returns (bool);
+
+    function recordUsage(uint256 agentId, address user, uint256 count) external;
+
+    function batchRecordUsage(
+        uint256[] calldata agentIds,
+        address[] calldata users,
+        uint256[] calldata counts
+    ) external;
 
     function getCurrentConfig(uint256 agentId) external view returns (PassConfig memory);
 
