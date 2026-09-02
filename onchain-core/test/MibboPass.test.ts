@@ -29,6 +29,28 @@ describe("MibboPass", { concurrency: 1 }, () => {
     await assert.rejects(passAsBuyer.write.safeTransferFrom([ctx.user2.account.address, ctx.stranger.account.address, agentId, 1n, "0x"]));
   });
 
+  it("counts unique current holders for each ERC-1155 pass ID", async () => {
+    const agentId = await registerAgent(ctx);
+    await configure(agentId);
+    const firstBuyerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.user2 } });
+    const secondBuyerPass = await ctx.viem.getContractAt("MibboPass", ctx.pass.address, { client: { wallet: ctx.stranger } });
+
+    assert.equal(await ctx.pass.read.holderCount([agentId]), 0n);
+    await ctx.token.write.approve([ctx.pass.address, parseUnits("20", 6)], { account: ctx.user2.account });
+    await ctx.token.write.mint([ctx.stranger.account.address, parseUnits("20", 6)]);
+    await ctx.token.write.approve([ctx.pass.address, parseUnits("20", 6)], { account: ctx.stranger.account });
+
+    await firstBuyerPass.write.purchasePass([agentId]);
+    assert.equal(await ctx.pass.read.holderCount([agentId]), 1n);
+
+    // Renewal burns and re-mints the same pass, so it must not create another holder.
+    await firstBuyerPass.write.purchasePass([agentId]);
+    assert.equal(await ctx.pass.read.holderCount([agentId]), 1n);
+
+    await secondBuyerPass.write.purchasePass([agentId]);
+    assert.equal(await ctx.pass.read.holderCount([agentId]), 2n);
+  });
+
   it("only lets a relayer record usage and closes access at the quota", async () => {
     const agentId = await registerAgent(ctx);
     await configure(agentId);

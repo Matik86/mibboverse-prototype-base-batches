@@ -79,6 +79,7 @@ contract MibboRegistry is IMibboRegistry, IERC721Receiver {
         external override onlyAgentOwner(agentId)
     {
         agentTreasury.updateAgentURI(agentId, newURI);
+        emit AgentURIUpdated(agentId, newURI);
     }
 
     function getAgentOwner(uint256 agentId) external view override returns (address) {

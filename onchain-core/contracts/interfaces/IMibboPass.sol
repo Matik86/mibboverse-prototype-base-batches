@@ -42,6 +42,10 @@ interface IMibboPass {
 
     function hasAccess(address user, uint256 agentId) external view returns (bool);
 
+    /// @notice Returns the number of addresses whose ERC-1155 balance for an agent pass is non-zero.
+    /// @dev This is a MibboPass extension: ERC-1155 itself does not enumerate token holders.
+    function holderCount(uint256 agentId) external view returns (uint256);
+
     function recordUsage(uint256 agentId, address user, uint256 count) external;
 
     function batchRecordUsage(

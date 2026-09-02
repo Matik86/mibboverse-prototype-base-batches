@@ -7,7 +7,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin],
+  plugins: [hardhatToolboxViemPlugin, hardhatVerify],
   solidity: {
     profiles: {
       default: {
@@ -43,6 +43,12 @@ export default defineConfig({
       type: "http",
       chainType: "l1",
       url: configVariable("BASE_SEPOLIA_RPC_URL"),
+      accounts: [configVariable("PRIVATE_KEY")],
+    },
+    base: {
+      type: "http",
+      chainType: "l1",
+      url: configVariable("BASE_MAINNET_RPC_URL"),
       accounts: [configVariable("PRIVATE_KEY")],
     },
   },

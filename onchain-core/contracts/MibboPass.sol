@@ -32,6 +32,9 @@ contract MibboPass is ERC1155, Ownable, IMibboPass {
     mapping(uint256 => mapping(address => UserPassState)) private _passMeta;
     mapping(address => uint256[]) private _userPasses;
     mapping(address => mapping(uint256 => bool)) private _hasPassRecord;
+    // ERC-1155 has no holder enumeration. Track only zero/non-zero balance crossings
+    // so this remains the number of unique current holders, not total token supply.
+    mapping(uint256 => uint256) private _holderCounts;
     mapping(uint256 => mapping(uint32 => string)) private _configURIs;
     mapping(uint256 => uint32) public currentVersion;
     mapping(uint256 => mapping(uint32 => PassConfig)) private _configHistory;
@@ -144,6 +147,10 @@ contract MibboPass is ERC1155, Ownable, IMibboPass {
                meta.requestsUsed < meta.maxRequests;
     }
 
+    function holderCount(uint256 agentId) external view override returns (uint256) {
+        return _holderCounts[agentId];
+    }
+
     function recordUsage(uint256 agentId, address user, uint256 count)
         external override onlyRelayer
     {
@@ -240,6 +247,19 @@ contract MibboPass is ERC1155, Ownable, IMibboPass {
         uint256[] memory values
     ) internal override {
         if (from != address(0) && to != address(0)) revert Soulbound();
+
+        // MibboPass only mints and burns one ID at a time. Update before ERC-1155
+        // mutates balances, allowing us to detect whether an address enters or leaves
+        // the holder set for that ID.
+        for (uint256 i = 0; i < ids.length; ++i) {
+            if (values[i] == 0) continue;
+
+            if (from == address(0) && balanceOf(to, ids[i]) == 0) {
+                ++_holderCounts[ids[i]];
+            } else if (to == address(0) && balanceOf(from, ids[i]) == values[i]) {
+                --_holderCounts[ids[i]];
+            }
+        }
         super._update(from, to, ids, values);
     }
 

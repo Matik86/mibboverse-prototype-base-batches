@@ -11,6 +11,7 @@ interface IMibboRegistry {
     error UnauthorizedERC721Sender(address sender);
 
     event AgentRegistered(uint256 indexed agentId, address indexed beneficialOwner);
+    event AgentURIUpdated(uint256 indexed agentId, string newURI);
 
     function registerAgent(
         AgentCard calldata card, uint256 walletDeadline, bytes calldata walletSig
